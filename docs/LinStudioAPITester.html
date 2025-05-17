@@ -1,0 +1,1040 @@
+<!DOCTYPE html><html lang="zh-CN"><head>    <meta charset="UTF-8">    <meta name="viewport" content="width=device-width, initial-scale=1.0">    <title>Lin_studio API 测试</title>    <!-- Tailwind CSS -->    <script src="https://cdn.tailwindcss.com"></script>    <!-- Axios -->    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>    <!-- Vue 3 -->    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>    <!-- Highlight.js for JSON formatting -->    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/json.min.js"></script>    <script>        tailwind.config = {            theme: {                extend: {                    colors: {                        primary: '#3b82f6',                        secondary: '#64748b',                        success: '#22c55e',                        danger: '#ef4444',                        warning: '#f59e0b',                        info: '#0ea5e9',                    }                }            }        }    </script>    <style type="text/tailwindcss">        .btn {            @apply px-4 py-2 rounded transition-colors duration-200 font-medium;        }        .btn-primary {            @apply bg-primary text-white hover:bg-primary/90;        }        .btn-secondary {            @apply bg-secondary text-white hover:bg-primary/90;        }        .btn-success {            @apply bg-success text-white hover:bg-success/90;        }        .btn-danger {            @apply bg-danger text-white hover:bg-danger/90;        }        .btn-warning {            @apply bg-warning text-white hover:bg-warning/90;        }        .btn-info {            @apply bg-info text-white hover:bg-info/90;        }        .form-input {            @apply w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;        }        .form-textarea {            @apply w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;        }        .form-select {            @apply w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;        }        .card {            @apply bg-white rounded-lg shadow-md overflow-hidden;        }        .tab-button {            @apply px-4 py-2 font-medium transition-colors duration-200;        }        .tab-button.active {            @apply border-b-2 border-primary text-primary;        }        .tab-button:not(.active) {            @apply text-gray-500 hover:text-gray-700;        }        .json-viewer {            @apply bg-gray-100 p-4 rounded-md overflow-x-auto;            max-height: 300px;        }        .badge {            @apply px-2 py-1 text-xs rounded-full;        }        .badge-success {            @apply bg-success/20 text-success;        }        .badge-error {            @apply bg-danger/20 text-danger;        }        .notification {            @apply fixed right-4 bottom-4 p-4 rounded-lg shadow-lg text-white animate-fade-in;            min-width: 300px;            z-index: 100;        }        .notification-success {            @apply bg-success;        }        .notification-error {            @apply bg-danger;        }        @keyframes fade-in {            from {                opacity: 0;                transform: translateY(20px);            }            to {                opacity: 1;                transform: translateY(0);            }        }        .animate-fade-in {            animation: fade-in 0.3s ease-out;        }    </style></head><body class="bg-gray-100 min-h-screen">    <div id="app" class="container mx-auto px-4 py-8">        <!-- 通知组件 -->        <div v-if="notification" :class="['notification', `notification-${notification.type}`]">            {{ notification.message }}        </div>                <!-- 导航栏 -->        <nav class="bg-white shadow-md rounded-lg p-4 mb-6 flex justify-between items-center">            <div class="text-xl font-bold text-primary">Lin_studio API 测试</div>            <div class="flex items-center gap-4">                <div v-if="!isBaseUrlSet" class="flex items-center gap-2">                    <input                         type="text"                         v-model="baseUrl"                         class="form-input w-64"                         placeholder="请输入API基础地址，如: http://localhost:8080/api/v1"                        title="API基础地址"                    >                    <button @click="saveBaseUrl" class="btn btn-primary">保存</button>                </div>                <div v-else class="flex items-center gap-2">                    <span class="text-sm text-gray-600">API地址: {{ baseUrl }}</span>                    <button @click="isBaseUrlSet = false" class="text-sm text-primary">修改</button>                </div>                <div v-if="isLoggedIn" class="flex items-center gap-4">                    <span>欢迎，{{ userInfo.username }}</span>                    <button @click="logout" class="btn btn-secondary">退出登录</button>                </div>            </div>        </nav>
+
+                <!-- 未设置基础URL时显示设置界面 -->        <div v-if="!isBaseUrlSet" class="card max-w-md mx-auto p-6">            <h2 class="text-2xl font-bold mb-6 text-center">设置API基础地址</h2>            <div class="space-y-4">                <div>                    <label class="block mb-1">API基础地址</label>                    <input                         type="text"                         v-model="baseUrl"                         class="form-input"                         placeholder="请输入API基础地址，如: http://localhost:8080/api/v1"                         title="API基础地址"                         required>                </div>                <button @click="saveBaseUrl" class="btn btn-primary w-full" :disabled="isLoading">                    {{ isLoading ? '保存中...' : '保存并继续' }}                </button>            </div>        </div>        <!-- 登录界面 -->        <div v-else-if="!isLoggedIn" class="card max-w-md mx-auto p-6">            <h2 class="text-2xl font-bold mb-6 text-center">用户登录</h2>            <div v-if="loginError" class="bg-danger/10 text-danger p-3 rounded mb-4">                {{ loginError }}            </div>            <form @submit.prevent="login" class="space-y-4">                <div>                    <label class="block mb-1">用户名</label>                    <input                         type="text"                         v-model="loginForm.username"                         class="form-input"                         placeholder="请输入用户名"                         title="用户名"                         required>                </div>                <div>                    <label class="block mb-1">密码</label>                    <input                         type="password"                         v-model="loginForm.password"                         class="form-input"                         placeholder="请输入密码"                         title="密码"                         required>                </div>                <button type="submit" class="btn btn-primary w-full" :disabled="isLoading">                    {{ isLoading ? '登录中...' : '登录' }}                </button>            </form>        </div>        <!-- 主界面 -->        <div v-else>            <!-- 标签切换 -->            <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">                <button                     @click="activeTab = 'api-test'"                     :class="['tab-button', activeTab === 'api-test' ? 'active' : '']">                    API测试                </button>                <button                     @click="activeTab = 'articles'"                     :class="['tab-button', activeTab === 'articles' ? 'active' : '']">                    文章列表                </button>                <button                     @click="activeTab = 'profile'"                     :class="['tab-button', activeTab === 'profile' ? 'active' : '']">                    个人资料                </button>                <button                     @click="activeTab = 'categories'"                     :class="['tab-button', activeTab === 'categories' ? 'active' : '']">                    分类列表                </button>                <button                     @click="activeTab = 'tags'"                     :class="['tab-button', activeTab === 'tags' ? 'active' : '']">                    标签列表                </button>            </div>                        <!-- API测试界面 -->            <div v-if="activeTab === 'api-test'" class="grid grid-cols-1 lg:grid-cols-4 gap-6">                <!-- 左侧导航 -->                <div class="lg:col-span-1">                    <div class="card p-4">                        <h3 class="text-lg font-bold mb-4">API接口分类</h3>                        <div class="space-y-2">                            <button                                 v-for="category in apiCategories"                                 :key="category.id"                                @click="changeApiCategory(category.id)"                                :class="['w-full text-left px-3 py-2 rounded', currentApiCategory === category.id ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-gray-100']">                                {{ category.name }}                            </button>                        </div>                    </div>                </div>                                <!-- 右侧内容 -->                <div class="lg:col-span-3 space-y-6">                    <!-- 接口列表 -->                    <div class="card p-4">                        <h3 class="text-lg font-bold mb-4">接口列表</h3>                        <div class="overflow-x-auto">                            <table class="min-w-full">                                <thead>                                    <tr class="border-b">                                        <th class="py-2 px-4 text-left">接口名称</th>                                        <th class="py-2 px-4 text-left">请求方法</th>                                        <th class="py-2 px-4 text-left">URL</th>                                        <th class="py-2 px-4 text-center">操作</th>                                    </tr>                                </thead>                                <tbody>                                    <tr v-for="endpoint in currentEndpoints" :key="endpoint.id"                                         :class="['border-b', currentApiEndpoint === endpoint.id ? 'bg-primary/5' : '']">                                        <td class="py-2 px-4">{{ endpoint.name }}</td>                                        <td class="py-2 px-4">                                            <span :class="{                                                'bg-primary/20 text-primary': endpoint.method === 'GET',                                                'bg-success/20 text-success': endpoint.method === 'POST',                                                'bg-warning/20 text-warning': endpoint.method === 'PUT',                                                'bg-danger/20 text-danger': endpoint.method === 'DELETE'                                            }" class="badge">                                                {{ endpoint.method }}                                            </span>                                        </td>                                        <td class="py-2 px-4 font-mono text-sm">{{ endpoint.url }}</td>                                        <td class="py-2 px-4 text-center">                                            <button                                                 @click="selectEndpoint(endpoint.id)"                                                class="btn btn-sm btn-primary py-1">                                                测试                                            </button>                                        </td>                                    </tr>                                </tbody>                            </table>                        </div>                    </div>                                        <!-- 接口测试面板 -->                    <div v-if="currentEndpoint" class="card p-4">                        <div class="flex justify-between items-center mb-4">                            <h3 class="text-lg font-bold">{{ currentEndpoint.name }}</h3>                            <div>                                <span :class="{                                    'bg-primary/20 text-primary': currentEndpoint.method === 'GET',                                    'bg-success/20 text-success': currentEndpoint.method === 'POST',                                    'bg-warning/20 text-warning': currentEndpoint.method === 'PUT',                                    'bg-danger/20 text-danger': currentEndpoint.method === 'DELETE'                                }" class="badge mr-2">                                    {{ currentEndpoint.method }}                                </span>                                <span class="font-mono text-sm">{{ currentEndpoint.url }}</span>                            </div>                        </div>                                                <!-- 请求参数编辑器 -->                        <div class="mb-4">                            <div class="flex justify-between items-center mb-2">                                <label class="font-medium">请求参数</label>                                <div>                                    <button @click="resetRequestParams" class="text-sm text-primary">重置为默认值</button>                                </div>                            </div>                            <textarea                                 v-model="formattedRequestParams"                                @input="updateRequestParams"                                class="form-textarea font-mono text-sm"                                rows="10"                                placeholder="{}"                            ></textarea>                        </div>                                                <!-- 发送请求按钮 -->                        <div class="mb-4">                            <button                                 @click="sendRequest"                                 class="btn btn-primary"                                :disabled="isLoading">                                {{ isLoading ? '发送中...' : '发送请求' }}                            </button>                        </div>                                                <!-- 响应结果 -->                        <div v-if="responseData !== null">                            <div class="flex justify-between items-center mb-2">                                <label class="font-medium">响应结果</label>                                <div>                                    <span :class="[                                        'badge mr-2',                                        responseStatus === 'success' ? 'badge-success' : 'badge-error'                                    ]">                                        {{ responseStatus }}                                    </span>                                    <span class="text-sm text-gray-500">{{ responseTime }}ms</span>                                </div>                            </div>                            <pre class="json-viewer"><code class="language-json">{{ formattedResponseData }}</code></pre>                        </div>                    </div>                </div>            </div>
+
+            <!-- 文章列表 -->
+            <div v-if="activeTab === 'articles'">
+                <div v-if="isLoading" class="flex justify-center py-8">
+                    <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                </div>
+                <div v-else-if="articles.length === 0" class="text-center py-8 text-gray-500">
+                    暂无文章
+                </div>
+                <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div v-for="article in articles" :key="article.id" class="card">
+                        <img 
+                            v-if="article.cover_image" 
+                            :src="article.cover_image" 
+                            :alt="`${article.title}的封面图片`" 
+                            title="文章封面图片"
+                            class="w-full h-48 object-cover">
+                        <div v-else class="w-full h-48 bg-gray-200 flex items-center justify-center">
+                            <span class="text-gray-400">无封面图片</span>
+                        </div>
+                        <div class="p-4">
+                            <h3 class="text-xl font-bold mb-2">{{ article.title }}</h3>
+                            <p class="text-gray-600 mb-4 line-clamp-2">{{ article.excerpt }}</p>
+                            <div class="flex items-center text-sm text-gray-500 mb-4">
+                                <span>{{ new Date(article.created_at).toLocaleDateString() }}</span>
+                                <span class="mx-2">·</span>
+                                <span>{{ article.author?.username }}</span>
+                            </div>
+                            <div class="flex flex-wrap gap-2 mb-4">
+                                <span v-for="tag in article.tags" :key="tag.id" class="px-2 py-1 text-xs bg-gray-100 rounded-full">
+                                    {{ tag.name }}
+                                </span>
+                            </div>
+                            <button @click="viewArticle(article.slug)" class="btn btn-primary w-full">查看详情</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 分页 -->
+                <div v-if="pagination && pagination.total_pages > 1" class="flex justify-center mt-8 gap-2">
+                    <button 
+                        @click="changePage(currentPage - 1)" 
+                        :disabled="currentPage === 1"
+                        class="btn btn-secondary" 
+                        :class="{ 'opacity-50 cursor-not-allowed': currentPage === 1 }">
+                        上一页
+                    </button>
+                    <button 
+                        @click="changePage(currentPage + 1)" 
+                        :disabled="currentPage === pagination.total_pages"
+                        class="btn btn-secondary"
+                        :class="{ 'opacity-50 cursor-not-allowed': currentPage === pagination.total_pages }">
+                        下一页
+                    </button>
+                </div>
+            </div>
+
+            <!-- 文章详情弹窗 -->
+            <div v-if="selectedArticle" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <h2 class="text-2xl font-bold">{{ selectedArticle.title }}</h2>
+                            <button @click="selectedArticle = null" class="text-2xl">&times;</button>
+                        </div>
+                        <div class="flex items-center text-sm text-gray-500 mb-4">
+                            <span>{{ new Date(selectedArticle.created_at).toLocaleDateString() }}</span>
+                            <span class="mx-2">·</span>
+                            <span>{{ selectedArticle.author?.username }}</span>
+                            <span class="mx-2">·</span>
+                            <span>{{ selectedArticle.category?.name }}</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mb-4">
+                            <span v-for="tag in selectedArticle.tags" :key="tag.id" class="px-2 py-1 text-xs bg-gray-100 rounded-full">
+                                {{ tag.name }}
+                            </span>
+                        </div>
+                        <div class="prose max-w-none" v-html="selectedArticle.content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 个人资料 -->
+            <div v-if="activeTab === 'profile'" class="card p-6">
+                <h2 class="text-2xl font-bold mb-6">个人资料</h2>
+                <div v-if="isLoading" class="flex justify-center py-8">
+                    <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                </div>
+                <div v-else class="space-y-4">
+                    <div class="flex flex-col md:flex-row md:items-center">
+                        <div class="md:w-1/4 font-medium">头像:</div>
+                        <div class="md:w-3/4">
+                            <img 
+                                :src="userProfile.avatar || 'https://via.placeholder.com/100'" 
+                                :alt="`${userProfile.username || '用户'}的头像`" 
+                                title="用户头像"
+                                class="w-20 h-20 rounded-full">
+                        </div>
+                    </div>
+                    <div class="flex flex-col md:flex-row md:items-center">
+                        <div class="md:w-1/4 font-medium">用户名:</div>
+                        <div class="md:w-3/4">{{ userProfile.username }}</div>
+                    </div>
+                    <div class="flex flex-col md:flex-row md:items-center">
+                        <div class="md:w-1/4 font-medium">邮箱:</div>
+                        <div class="md:w-3/4">{{ userProfile.email }}</div>
+                    </div>
+                    <div class="flex flex-col md:flex-row md:items-center">
+                        <div class="md:w-1/4 font-medium">角色:</div>
+                        <div class="md:w-3/4">{{ userProfile.role }}</div>
+                    </div>
+                    <div class="flex flex-col md:flex-row md:items-center">
+                        <div class="md:w-1/4 font-medium">个人简介:</div>
+                        <div class="md:w-3/4">{{ userProfile.bio || '暂无简介' }}</div>
+                    </div>
+                    <div class="flex flex-col md:flex-row md:items-center">
+                        <div class="md:w-1/4 font-medium">最后登录:</div>
+                        <div class="md:w-3/4">{{ userProfile.last_login ? new Date(userProfile.last_login).toLocaleString() : '未知' }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分类列表 -->
+            <div v-if="activeTab === 'categories'">
+                <div v-if="isLoading" class="flex justify-center py-8">
+                    <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                </div>
+                <div v-else-if="categories.length === 0" class="text-center py-8 text-gray-500">
+                    暂无分类
+                </div>
+                <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div v-for="category in categories" :key="category.id" class="card p-4">
+                        <h3 class="text-xl font-bold mb-2">{{ category.name }}</h3>
+                        <p class="text-gray-600 mb-2">{{ category.description || '暂无描述' }}</p>
+                        <div class="text-sm text-gray-500">
+                            文章数: {{ category.articles_count }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 标签列表 -->
+            <div v-if="activeTab === 'tags'">
+                <div v-if="isLoading" class="flex justify-center py-8">
+                    <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                </div>
+                <div v-else-if="tags.length === 0" class="text-center py-8 text-gray-500">
+                    暂无标签
+                </div>
+                <div v-else class="flex flex-wrap gap-4">
+                    <div v-for="tag in tags" :key="tag.id" class="card p-4 min-w-[200px]">
+                        <h3 class="text-lg font-bold mb-2">{{ tag.name }}</h3>
+                        <div class="text-sm text-gray-500">
+                            文章数: {{ tag.articles_count }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 创建API服务
+        const createApiService = (baseUrl) => {
+            // 创建Axios实例
+            const axiosInstance = axios.create({
+                baseURL: baseUrl,
+                timeout: 15000,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            // 请求拦截器
+            axiosInstance.interceptors.request.use(
+                config => {
+                    const token = localStorage.getItem('token');
+                    if (token) {
+                        config.headers.Authorization = `Bearer ${token}`;
+                    }
+                    return config;
+                },
+                error => {
+                    return Promise.reject(error);
+                }
+            );
+            
+            // 响应拦截器
+            axiosInstance.interceptors.response.use(
+                response => {
+                    if (response.data.status === 'success') {
+                        return response;
+                    } else {
+                        return Promise.reject(new Error(response.data.message || '请求失败'));
+                    }
+                },
+                error => {
+                    let errorMsg = '未知错误';
+                    if (error.response) {
+                        // 服务器返回了错误状态码
+                        errorMsg = error.response.data?.message || `请求错误: ${error.response.status}`;
+                        // 如果是401未授权，清除token
+                        if (error.response.status === 401) {
+                            localStorage.removeItem('token');
+                        }
+                    } else if (error.request) {
+                        // 请求发送成功，但没有收到响应
+                        errorMsg = '服务器无响应，请检查网络连接';
+                    } else {
+                        // 请求设置有误
+                        errorMsg = error.message;
+                    }
+                    return Promise.reject(new Error(errorMsg));
+                }
+            );
+            
+            return {
+                // 获取本地存储的token
+                get token() {
+                    return localStorage.getItem('token');
+                },
+                
+                // 获取基本URL
+                baseURL: baseUrl,
+                
+                // 设置token
+                setToken(token) {
+                    if (token) {
+                        localStorage.setItem('token', token);
+                    } else {
+                        localStorage.removeItem('token');
+                    }
+                },
+                
+                // ==== 认证接口 ====
+                // 登录
+                async login(username, password) {
+                    try {
+                        const response = await axiosInstance.post('/auth/login', {
+                            username,
+                            password
+                        });
+                        this.setToken(response.data.data.token);
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // 注册
+                async register(userData) {
+                    try {
+                        const response = await axiosInstance.post('/auth/register', userData);
+                        return response.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // 刷新令牌
+                async refreshToken(refreshToken) {
+                    try {
+                        const response = await axiosInstance.post('/auth/refresh', {
+                            refresh_token: refreshToken
+                        });
+                        this.setToken(response.data.data.token);
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // 修改密码
+                async changePassword(currentPassword, newPassword) {
+                    try {
+                        const response = await axiosInstance.post('/auth/change-password', {
+                            current_password: currentPassword,
+                            new_password: newPassword
+                        });
+                        return response.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // 登出
+                async logout() {
+                    try {
+                        if (this.token) {
+                            await axiosInstance.post('/auth/logout');
+                        }
+                    } catch (error) {
+                        console.error('登出失败', error);
+                    } finally {
+                        this.setToken(null);
+                    }
+                },
+                
+                // ==== 用户接口 ====
+                // 获取个人资料
+                async getProfile() {
+                    try {
+                        const response = await axiosInstance.get('/users/profile');
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // 更新个人资料
+                async updateProfile(profileData) {
+                    try {
+                        const response = await axiosInstance.put('/users/profile', profileData);
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // 上传头像
+                async uploadAvatar(file) {
+                    try {
+                        const formData = new FormData();
+                        formData.append('avatar', file);
+                        
+                        const response = await axiosInstance.post('/users/avatar', formData, {
+                            headers: {
+                                'Content-Type': 'multipart/form-data'
+                            }
+                        });
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // ==== 文章接口 ====
+                // 获取文章列表
+                async getArticles(params = {}) {
+                    try {
+                        const response = await axiosInstance.get('/articles', { params });
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // 获取文章详情
+                async getArticle(slug) {
+                    try {
+                        const response = await axiosInstance.get(`/articles/${slug}`);
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // 创建文章
+                async createArticle(articleData) {
+                    try {
+                        const response = await axiosInstance.post('/articles', articleData);
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // 更新文章
+                async updateArticle(id, articleData) {
+                    try {
+                        const response = await axiosInstance.put(`/articles/${id}`, articleData);
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // ==== 分类接口 ====
+                // 获取分类列表
+                async getCategories() {
+                    try {
+                        const response = await axiosInstance.get('/categories');
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // 创建分类
+                async createCategory(categoryData) {
+                    try {
+                        const response = await axiosInstance.post('/categories', categoryData);
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // ==== 标签接口 ====
+                // 获取标签列表
+                async getTags() {
+                    try {
+                        const response = await axiosInstance.get('/tags');
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // 创建标签
+                async createTag(tagData) {
+                    try {
+                        const response = await axiosInstance.post('/tags', tagData);
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // ==== 评论接口 ====
+                // 获取评论列表
+                async getComments(params = {}) {
+                    try {
+                        const response = await axiosInstance.get('/comments', { params });
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // 创建评论
+                async createComment(commentData) {
+                    try {
+                        const response = await axiosInstance.post('/comments', commentData);
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // ==== 工具接口 ====
+                // 获取工具列表
+                async getTools(params = {}) {
+                    try {
+                        const response = await axiosInstance.get('/tools', { params });
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // 获取工具分类
+                async getToolCategories() {
+                    try {
+                        const response = await axiosInstance.get('/tools/categories');
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // 获取工具详情
+                async getTool(slug) {
+                    try {
+                        const response = await axiosInstance.get(`/tools/${slug}`);
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                },
+                
+                // 创建工具
+                async createTool(toolData) {
+                    try {
+                        const response = await axiosInstance.post('/tools', toolData);
+                        return response.data.data;
+                    } catch (error) {
+                        throw error;
+                    }
+                }
+            };
+        };
+        
+        // 创建Vue应用
+        const app = Vue.createApp({
+            data() {
+                return {
+                    baseUrl: localStorage.getItem('api_base_url') || 'http://localhost:8080/api/v1',
+                    isBaseUrlSet: !!localStorage.getItem('api_base_url'),
+                    isLoggedIn: !!localStorage.getItem('token'),
+                    isLoading: false,
+                    loginError: null,
+                    notification: null,
+                    loginForm: {
+                        username: 'linghao',
+                        password: 'password123'
+                    },
+                    userInfo: {},
+                    userProfile: {},
+                    articles: [],
+                    selectedArticle: null,
+                    pagination: null,
+                    currentPage: 1,
+                    activeTab: 'api-test',
+                    categories: [],
+                    tags: [],
+                    comments: [],
+                    tools: [],
+                    toolCategories: [],
+                    currentApiCategory: 'auth',
+                    currentApiEndpoint: 'login',
+                    apiCategories: [
+                        { id: 'auth', name: '认证接口' },
+                        { id: 'users', name: '用户接口' },
+                        { id: 'articles', name: '文章接口' },
+                        { id: 'categories', name: '分类接口' },
+                        { id: 'tags', name: '标签接口' },
+                        { id: 'comments', name: '评论接口' },
+                        { id: 'tools', name: '工具接口' }
+                    ],
+                    apiEndpoints: {
+                        auth: [
+                            { id: 'login', name: '登录', method: 'POST', url: '/auth/login' },
+                            { id: 'register', name: '注册', method: 'POST', url: '/auth/register' },
+                            { id: 'refresh', name: '刷新令牌', method: 'POST', url: '/auth/refresh' },
+                            { id: 'change-password', name: '修改密码', method: 'POST', url: '/auth/change-password' },
+                            { id: 'logout', name: '登出', method: 'POST', url: '/auth/logout' }
+                        ],
+                        users: [
+                            { id: 'profile', name: '获取个人资料', method: 'GET', url: '/users/profile' },
+                            { id: 'update-profile', name: '更新个人资料', method: 'PUT', url: '/users/profile' },
+                            { id: 'avatar', name: '上传头像', method: 'POST', url: '/users/avatar' }
+                        ],
+                        articles: [
+                            { id: 'list', name: '获取文章列表', method: 'GET', url: '/articles' },
+                            { id: 'detail', name: '获取文章详情', method: 'GET', url: '/articles/:slug' },
+                            { id: 'create', name: '创建文章', method: 'POST', url: '/articles' },
+                            { id: 'update', name: '更新文章', method: 'PUT', url: '/articles/:id' }
+                        ],
+                        categories: [
+                            { id: 'list', name: '获取分类列表', method: 'GET', url: '/categories' },
+                            { id: 'create', name: '创建分类', method: 'POST', url: '/categories' }
+                        ],
+                        tags: [
+                            { id: 'list', name: '获取标签列表', method: 'GET', url: '/tags' },
+                            { id: 'create', name: '创建标签', method: 'POST', url: '/tags' }
+                        ],
+                        comments: [
+                            { id: 'list', name: '获取评论列表', method: 'GET', url: '/comments' },
+                            { id: 'create', name: '创建评论', method: 'POST', url: '/comments' }
+                        ],
+                        tools: [
+                            { id: 'list', name: '获取工具列表', method: 'GET', url: '/tools' },
+                            { id: 'categories', name: '获取工具分类', method: 'GET', url: '/tools/categories' },
+                            { id: 'detail', name: '获取工具详情', method: 'GET', url: '/tools/:slug' },
+                            { id: 'create', name: '创建工具', method: 'POST', url: '/tools' }
+                        ]
+                    },
+                    requestParams: {},
+                    requestHeaders: {},
+                    responseData: null,
+                    responseStatus: null,
+                    responseTime: null,
+                    defaultRequestParams: {
+                        'auth/login': {
+                            username: 'linghao',
+                            password: 'password123'
+                        },
+                        'auth/register': {
+                            username: 'newuser',
+                            email: 'newuser@example.com',
+                            password: 'password123',
+                            role: 'user'
+                        },
+                        'auth/refresh': {
+                            refresh_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+                        },
+                        'auth/change-password': {
+                            current_password: 'oldpassword',
+                            new_password: 'newpassword'
+                        },
+                        'users/profile': {},
+                        'users/update-profile': {
+                            bio: 'Full stack developer and open source contributor',
+                            social_links: {
+                                github: 'https://github.com/linghao',
+                                twitter: 'https://twitter.com/linghao',
+                                linkedin: 'https://linkedin.com/in/linghao'
+                            },
+                            contact_info: {
+                                phone: '123456789',
+                                wechat: 'linghao123'
+                            }
+                        },
+                        'articles/list': {
+                            page: 1,
+                            limit: 10
+                        },
+                        'articles/detail': {
+                            slug: 'golang-study-notes'
+                        },
+                        'articles/create': {
+                            title: 'Gin框架实战',
+                            excerpt: '本文将介绍如何使用Gin框架构建RESTful API',
+                            content: '# Gin框架实战\n\n在本教程中，我们将学习如何使用Gin框架构建一个完整的RESTful API...',
+                            category_id: 1,
+                            tags: [1, 3],
+                            cover_image: 'https://example.com/images/gin-practice.jpg',
+                            status: 'published'
+                        },
+                        'articles/update': {
+                            id: 3,
+                            title: 'Gin框架实战（更新版）',
+                            excerpt: '本文将介绍如何使用Gin框架构建高性能的RESTful API',
+                            content: '# Gin框架实战（更新版）\n\n在本教程中，我们将学习如何使用Gin框架构建一个完整的RESTful API...',
+                            category_id: 1,
+                            tags: [1, 3, 4],
+                            cover_image: 'https://example.com/images/gin-practice-updated.jpg',
+                            status: 'published'
+                        },
+                        'categories/create': {
+                            name: '前端开发',
+                            description: '前端开发相关文章'
+                        },
+                        'tags/create': {
+                            name: 'Docker'
+                        },
+                        'comments/list': {
+                            page: 1,
+                            limit: 10,
+                            article_id: 1
+                        },
+                        'comments/create': {
+                            article_id: 1,
+                            content: '这篇文章对我很有帮助，特别是关于Gin中间件的部分！',
+                            parent_id: null,
+                            author_name: '匿名用户',
+                            author_email: 'anonymous@example.com'
+                        },
+                        'tools/list': {
+                            page: 1,
+                            limit: 10
+                        },
+                        'tools/detail': {
+                            slug: 'json-formatter'
+                        },
+                        'tools/create': {
+                            name: 'Markdown编辑器',
+                            description: '简单好用的Markdown在线编辑器',
+                            icon: 'markdown',
+                            category: '开发工具',
+                            content: '<div id="markdown-editor">...</div>',
+                            config: {
+                                default_theme: 'light',
+                                preview_mode: 'live',
+                                toolbar: ['bold', 'italic', 'link', 'image', 'code']
+                            },
+                            status: 'active'
+                        }
+                    }
+                };
+            },
+            computed: {
+                currentEndpoints() {
+                    return this.apiEndpoints[this.currentApiCategory] || [];
+                },
+                currentEndpoint() {
+                    return this.currentEndpoints.find(e => e.id === this.currentApiEndpoint) || {};
+                },
+                formattedRequestParams() {
+                    return JSON.stringify(this.requestParams, null, 2);
+                },
+                formattedResponseData() {
+                    return this.responseData ? JSON.stringify(this.responseData, null, 2) : '';
+                }
+            },
+            mounted() {
+                // 初始化API服务
+                if (this.isBaseUrlSet) {
+                    apiService = createApiService(this.baseUrl);
+                    // 如果已登录，初始化数据
+                    if (this.isLoggedIn) {
+                        this.fetchInitialData();
+                    }
+                }
+                
+                // 初始化请求参数
+                this.resetRequestParams();
+                
+                // 监听本地存储变化
+                window.addEventListener('storage', this.handleStorageChange);
+                
+                // 初始化代码高亮
+                this.$nextTick(() => {
+                    document.querySelectorAll('pre code').forEach((block) => {
+                        hljs.highlightElement(block);
+                    });
+                });
+            },
+            unmounted() {
+                window.removeEventListener('storage', this.handleStorageChange);
+            },
+            methods: {
+                // 保存基础URL
+                saveBaseUrl() {
+                    if (!this.baseUrl) return;
+                    
+                    // 检查URL格式
+                    if (!this.baseUrl.startsWith('http://') && !this.baseUrl.startsWith('https://')) {
+                        alert('请输入正确的URL格式，包含http://或https://');
+                        return;
+                    }
+                    
+                    // 移除URL末尾的斜杠
+                    let url = this.baseUrl;
+                    while (url.endsWith('/')) {
+                        url = url.slice(0, -1);
+                    }
+                    
+                    // 存储到本地存储
+                    localStorage.setItem('api_base_url', url);
+                    this.baseUrl = url;
+                    this.isBaseUrlSet = true;
+                    
+                    // 初始化API服务
+                    apiService = createApiService(this.baseUrl);
+                    
+                    // 显示成功通知
+                    this.showNotification('API基础地址设置成功', 'success');
+                },
+                
+                // 处理本地存储变化
+                handleStorageChange(event) {
+                    if (event.key === 'api_base_url') {
+                        this.baseUrl = event.newValue || '';
+                        this.isBaseUrlSet = !!event.newValue;
+                        if (this.isBaseUrlSet) {
+                            apiService = createApiService(this.baseUrl);
+                        }
+                    } else if (event.key === 'token') {
+                        this.isLoggedIn = !!event.newValue;
+                        if (!this.isLoggedIn) {
+                            this.userInfo = {};
+                            this.userProfile = {};
+                        }
+                    }
+                },
+                
+                // 显示通知
+                showNotification(message, type = 'success') {
+                    this.notification = {
+                        message,
+                        type
+                    };
+                    
+                    // 3秒后自动关闭
+                    setTimeout(() => {
+                        this.notification = null;
+                    }, 3000);
+                },
+                
+                // 切换API分类
+                changeApiCategory(categoryId) {
+                    this.currentApiCategory = categoryId;
+                    this.currentApiEndpoint = this.currentEndpoints[0]?.id || null;
+                    this.resetRequestParams();
+                },
+                
+                // 选择API接口
+                selectEndpoint(endpointId) {
+                    this.currentApiEndpoint = endpointId;
+                    this.resetRequestParams();
+                    
+                    // 高亮显示JSON
+                    this.$nextTick(() => {
+                        document.querySelectorAll('pre code').forEach((block) => {
+                            hljs.highlightElement(block);
+                        });
+                    });
+                },
+                
+                // 重置请求参数为默认值
+                resetRequestParams() {
+                    const key = `${this.currentApiCategory}/${this.currentApiEndpoint}`;
+                    this.requestParams = JSON.parse(JSON.stringify(this.defaultRequestParams[key] || {}));
+                    this.responseData = null;
+                },
+                
+                // 更新请求参数（从文本框中）
+                updateRequestParams(event) {
+                    try {
+                        this.requestParams = JSON.parse(event.target.value);
+                    } catch (error) {
+                        // 不处理解析错误，等待用户修正
+                    }
+                },
+                
+                // 发送请求
+                async sendRequest() {
+                    if (!this.currentEndpoint) return;
+                    
+                    this.isLoading = true;
+                    this.responseData = null;
+                    
+                    const startTime = Date.now();
+                    
+                    try {
+                        let response;
+                        const method = this.currentEndpoint.method;
+                        const endpoint = this.currentApiEndpoint;
+                        const category = this.currentApiCategory;
+                        
+                        // 根据接口类型调用不同的方法
+                        if (category === 'auth') {
+                            if (endpoint === 'login') {
+                                response = await apiService.login(this.requestParams.username, this.requestParams.password);
+                                this.userInfo = response.user;
+                                this.isLoggedIn = true;
+                            } else if (endpoint === 'register') {
+                                response = await apiService.register(this.requestParams);
+                            } else if (endpoint === 'refresh') {
+                                response = await apiService.refreshToken(this.requestParams.refresh_token);
+                            } else if (endpoint === 'change-password') {
+                                response = await apiService.changePassword(
+                                    this.requestParams.current_password, 
+                                    this.requestParams.new_password
+                                );
+                            } else if (endpoint === 'logout') {
+                                await apiService.logout();
+                                response = { message: '登出成功' };
+                                this.isLoggedIn = false;
+                                this.userInfo = {};
+                            }
+                        } else if (category === 'users') {
+                            if (endpoint === 'profile') {
+                                response = await apiService.getProfile();
+                            } else if (endpoint === 'update-profile') {
+                                response = await apiService.updateProfile(this.requestParams);
+                            } else if (endpoint === 'avatar') {
+                                response = { message: '头像上传需要在前端实现文件上传功能，此处为模拟测试' };
+                            }
+                        } else if (category === 'articles') {
+                            if (endpoint === 'list') {
+                                response = await apiService.getArticles(this.requestParams);
+                            } else if (endpoint === 'detail') {
+                                response = await apiService.getArticle(this.requestParams.slug);
+                            } else if (endpoint === 'create') {
+                                response = await apiService.createArticle(this.requestParams);
+                            } else if (endpoint === 'update') {
+                                const id = this.requestParams.id;
+                                delete this.requestParams.id;
+                                response = await apiService.updateArticle(id, this.requestParams);
+                            }
+                        } else if (category === 'categories') {
+                            if (endpoint === 'list') {
+                                response = await apiService.getCategories();
+                            } else if (endpoint === 'create') {
+                                response = await apiService.createCategory(this.requestParams);
+                            }
+                        } else if (category === 'tags') {
+                            if (endpoint === 'list') {
+                                response = await apiService.getTags();
+                            } else if (endpoint === 'create') {
+                                response = await apiService.createTag(this.requestParams);
+                            }
+                        } else if (category === 'comments') {
+                            if (endpoint === 'list') {
+                                response = await apiService.getComments(this.requestParams);
+                            } else if (endpoint === 'create') {
+                                response = await apiService.createComment(this.requestParams);
+                            }
+                        } else if (category === 'tools') {
+                            if (endpoint === 'list') {
+                                response = await apiService.getTools(this.requestParams);
+                            } else if (endpoint === 'categories') {
+                                response = await apiService.getToolCategories();
+                            } else if (endpoint === 'detail') {
+                                response = await apiService.getTool(this.requestParams.slug);
+                            } else if (endpoint === 'create') {
+                                response = await apiService.createTool(this.requestParams);
+                            }
+                        }
+                        
+                        this.responseData = response;
+                        this.responseStatus = 'success';
+                        
+                        // 高亮显示JSON
+                        this.$nextTick(() => {
+                            document.querySelectorAll('pre code').forEach((block) => {
+                                hljs.highlightElement(block);
+                            });
+                        });
+                    } catch (error) {
+                        console.error('请求失败', error);
+                        this.responseData = {
+                            status: 'error',
+                            message: error.message || '请求失败',
+                            error: error.toString()
+                        };
+                        this.responseStatus = 'error';
+                    } finally {
+                        this.responseTime = Date.now() - startTime;
+                        this.isLoading = false;
+                    }
+                },
+                
+                // 初始化数据
+                async fetchInitialData() {
+                    try {
+                        // 获取用户信息
+                        await this.fetchUserProfile();
+                        
+                        // 获取文章列表
+                        await this.fetchArticles();
+                    } catch (error) {
+                        console.error('初始化数据失败', error);
+                        // 如果token失效，则登出
+                        if (error.includes('未认证') || error.includes('无效')) {
+                            this.logout();
+                        }
+                    }
+                },
+                
+                // 登录
+                async login() {
+                    this.loginError = null;
+                    this.isLoading = true;
+                    
+                    try {
+                        const data = await apiService.login(this.loginForm.username, this.loginForm.password);
+                        this.userInfo = data.user;
+                        this.isLoggedIn = true;
+                        await this.fetchInitialData();
+                    } catch (error) {
+                        this.loginError = error.message || error;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+                
+                // 获取用户资料
+                async fetchUserProfile() {
+                    this.isLoading = true;
+                    
+                    try {
+                        this.userProfile = await apiService.getProfile();
+                    } catch (error) {
+                        console.error('获取用户资料失败', error);
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+                
+                // 获取文章列表
+                async fetchArticles() {
+                    this.isLoading = true;
+                    
+                    try {
+                        const data = await apiService.getArticles({page: this.currentPage});
+                        this.articles = data.articles || [];
+                        this.pagination = data.pagination;
+                    } catch (error) {
+                        console.error('获取文章列表失败', error);
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+                
+                // 查看文章详情
+                async viewArticle(slug) {
+                    this.isLoading = true;
+                    
+                    try {
+                        this.selectedArticle = await apiService.getArticle(slug);
+                    } catch (error) {
+                        console.error('获取文章详情失败', error);
+                        alert('获取文章详情失败: ' + error);
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+                
+                // 分页
+                async changePage(page) {
+                    if (page < 1 || page > this.pagination.total_pages) return;
+                    
+                    this.currentPage = page;
+                    await this.fetchArticles();
+                },
+                
+                // 获取分类列表
+                async fetchCategories() {
+                    this.isLoading = true;
+                    
+                    try {
+                        this.categories = await apiService.getCategories();
+                    } catch (error) {
+                        console.error('获取分类列表失败', error);
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+                
+                // 获取标签列表
+                async fetchTags() {
+                    this.isLoading = true;
+                    
+                    try {
+                        this.tags = await apiService.getTags();
+                    } catch (error) {
+                        console.error('获取标签列表失败', error);
+                    } finally {
+                        this.isLoading = false;
+                    }
+                }
+            },
+            watch: {
+                // 监听标签切换
+                async activeTab(newTab) {
+                    if (newTab === 'articles' && this.articles.length === 0) {
+                        await this.fetchArticles();
+                    } else if (newTab === 'profile' && !this.userProfile.id) {
+                        await this.fetchUserProfile();
+                    } else if (newTab === 'categories' && this.categories.length === 0) {
+                        await this.fetchCategories();
+                    } else if (newTab === 'tags' && this.tags.length === 0) {
+                        await this.fetchTags();
+                    }
+                }
+            }
+        });
+
+        // 挂载Vue应用
+        app.mount('#app');
+    </script>
+</body>
+</html>

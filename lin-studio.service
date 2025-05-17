@@ -1,0 +1,20 @@
+[Unit]
+Description=Lin Studio API Service
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+User=www-data
+Group=www-data
+Type=simple
+WorkingDirectory=/opt/lin-studio
+EnvironmentFile=/opt/lin-studio/.env
+ExecStart=/opt/lin-studio/lin-studio
+Restart=on-failure
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=lin-studio
+
+[Install]
+WantedBy=multi-user.target 
