@@ -24,10 +24,8 @@ func InitDB() {
 		config.Database.DBName,
 	)
 
-	logLevel := logger.Error
-	if getEnv("APP_ENV", "production") == "development" {
-		logLevel = logger.Info
-	}
+	// 始终使用Info级别以获取更多日志
+	logLevel := logger.Info
 
 	// 自定义GORM日志配置
 	gormLogger := logger.New(

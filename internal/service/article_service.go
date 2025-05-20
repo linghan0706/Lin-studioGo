@@ -3,6 +3,7 @@ package service
 import (
 	"Lin_studio/internal/domain"
 	"Lin_studio/internal/repository"
+	"Lin_studio/internal/utils"
 	"context"
 	"database/sql"
 	"errors"
@@ -16,14 +17,14 @@ import (
 
 // ArticleService 文章服务接口
 type ArticleService interface {
-	GetArticles(ctx context.Context, page, limit int, categoryID, tagID, authorID *uint, status, search, sort *string) ([]domain.Article, domain.PaginationData, error)
-	GetArticleByID(ctx context.Context, id uint) (*domain.Article, error)
-	GetArticleBySlug(ctx context.Context, slug string) (*domain.Article, error)
+	GetArticles(ctx context.Context, page, limit int, categoryID, tagID, authorID *uint, status, search, sort *string, renderHTML bool) ([]domain.Article, domain.PaginationData, error)
+	GetArticleByID(ctx context.Context, id uint, renderHTML bool) (*domain.Article, error)
+	GetArticleBySlug(ctx context.Context, slug string, renderHTML bool) (*domain.Article, error)
 	CreateArticle(ctx context.Context, title, excerpt, content string, authorID, categoryID uint, tagIDs []uint, coverImage, status string) (*domain.Article, error)
 	UpdateArticle(ctx context.Context, id uint, title, excerpt, content string, categoryID uint, tagIDs []uint, coverImage, status string) (*domain.Article, error)
 	DeleteArticle(ctx context.Context, id uint) error
 	UploadCoverImage(ctx context.Context, file *multipart.FileHeader) (string, error)
-	GetFeaturedArticles(ctx context.Context, limit int) ([]domain.Article, error)
+	GetFeaturedArticles(ctx context.Context, limit int, renderHTML bool) ([]domain.Article, error)
 	ViewArticle(ctx context.Context, id uint) error
 	LikeArticle(ctx context.Context, id uint) error
 }
@@ -57,6 +58,7 @@ func (s *ArticleServiceImpl) GetArticles(
 	page, limit int,
 	categoryID, tagID, authorID *uint,
 	status, search, sort *string,
+	renderHTML bool,
 ) ([]domain.Article, domain.PaginationData, error) {
 	// 创建过滤条件
 	filter := repository.ArticleFilter{
@@ -105,13 +107,21 @@ func (s *ArticleServiceImpl) GetArticles(
 		if err == nil {
 			articles[i].Tags = tags
 		}
+		
+		// 如果需要渲染HTML
+		if renderHTML && articles[i].Content != "" {
+			html, err := utils.RenderMarkdown(articles[i].Content)
+			if err == nil {
+				articles[i].ContentHTML = html
+			}
+		}
 	}
 
 	return articles, pagination, nil
 }
 
 // GetArticleByID 根据ID获取文章
-func (s *ArticleServiceImpl) GetArticleByID(ctx context.Context, id uint) (*domain.Article, error) {
+func (s *ArticleServiceImpl) GetArticleByID(ctx context.Context, id uint, renderHTML bool) (*domain.Article, error) {
 	article, err := s.articleRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -123,12 +133,20 @@ func (s *ArticleServiceImpl) GetArticleByID(ctx context.Context, id uint) (*doma
 
 	// 加载相关数据
 	s.loadArticleRelations(ctx, article)
+	
+	// 如果需要渲染HTML
+	if renderHTML && article.Content != "" {
+		html, err := utils.RenderMarkdown(article.Content)
+		if err == nil {
+			article.ContentHTML = html
+		}
+	}
 
 	return article, nil
 }
 
 // GetArticleBySlug 根据Slug获取文章
-func (s *ArticleServiceImpl) GetArticleBySlug(ctx context.Context, slug string) (*domain.Article, error) {
+func (s *ArticleServiceImpl) GetArticleBySlug(ctx context.Context, slug string, renderHTML bool) (*domain.Article, error) {
 	article, err := s.articleRepo.FindBySlug(ctx, slug)
 	if err != nil {
 		return nil, err
@@ -140,6 +158,14 @@ func (s *ArticleServiceImpl) GetArticleBySlug(ctx context.Context, slug string) 
 
 	// 加载相关数据
 	s.loadArticleRelations(ctx, article)
+	
+	// 如果需要渲染HTML
+	if renderHTML && article.Content != "" {
+		html, err := utils.RenderMarkdown(article.Content)
+		if err == nil {
+			article.ContentHTML = html
+		}
+	}
 
 	return article, nil
 }
@@ -197,11 +223,18 @@ func (s *ArticleServiceImpl) CreateArticle(
 		}
 	}
 
+	// 渲染Markdown内容为HTML
+	contentHTML, err := utils.RenderMarkdown(content)
+	if err != nil {
+		return nil, fmt.Errorf("渲染Markdown内容失败: %w", err)
+	}
+
 	article := &domain.Article{
 		Title:       title,
 		Slug:        slug,
 		Excerpt:     excerpt,
 		Content:     content,
+		ContentHTML: contentHTML, // 添加渲染后的HTML内容
 		AuthorID:    authorID,
 		CategoryID:  catID,
 		CoverImage:  coverImage,
@@ -282,10 +315,21 @@ func (s *ArticleServiceImpl) UpdateArticle(
 		publishedAt = article.PublishedAt
 	}
 
+	// 检查内容是否有更改，有则重新渲染HTML
+	contentHTML := article.ContentHTML
+	if article.Content != content {
+		html, err := utils.RenderMarkdown(content)
+		if err != nil {
+			return nil, fmt.Errorf("渲染Markdown内容失败: %w", err)
+		}
+		contentHTML = html
+	}
+
 	// 更新文章字段
 	article.Title = title
 	article.Excerpt = excerpt
 	article.Content = content
+	article.ContentHTML = contentHTML // 更新渲染后的HTML内容
 	article.CategoryID = catID
 	if coverImage != "" {
 		article.CoverImage = coverImage
@@ -371,7 +415,7 @@ func (s *ArticleServiceImpl) UploadCoverImage(ctx context.Context, file *multipa
 }
 
 // GetFeaturedArticles 获取精选文章
-func (s *ArticleServiceImpl) GetFeaturedArticles(ctx context.Context, limit int) ([]domain.Article, error) {
+func (s *ArticleServiceImpl) GetFeaturedArticles(ctx context.Context, limit int, renderHTML bool) ([]domain.Article, error) {
 	articles, err := s.articleRepo.FindFeatured(ctx, limit)
 	if err != nil {
 		return nil, err
@@ -389,6 +433,14 @@ func (s *ArticleServiceImpl) GetFeaturedArticles(ctx context.Context, limit int)
 			category, err := s.categoryRepo.FindByID(ctx, *articles[i].CategoryID)
 			if err == nil && category != nil {
 				articles[i].Category = category
+			}
+		}
+		
+		// 如果需要渲染HTML
+		if renderHTML && articles[i].Content != "" {
+			html, err := utils.RenderMarkdown(articles[i].Content)
+			if err == nil {
+				articles[i].ContentHTML = html
 			}
 		}
 	}

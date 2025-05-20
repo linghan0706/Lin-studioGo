@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"Lin_studio/internal/domain"
 	"Lin_studio/internal/service"
 	"Lin_studio/internal/utils"
 	"strconv"
@@ -77,6 +78,9 @@ func (h *ArticleHandler) GetArticles(c *gin.Context) {
 		sort = &sortStr
 	}
 	
+	// 检查是否需要渲染Markdown
+	renderHTML := c.Query("render_html") == "true"
+	
 	// 查询文章
 	articles, pagination, err := h.articleService.GetArticles(
 		c.Request.Context(),
@@ -88,6 +92,7 @@ func (h *ArticleHandler) GetArticles(c *gin.Context) {
 		status,
 		search,
 		sort,
+		renderHTML,
 	)
 	
 	if err != nil {
@@ -107,8 +112,11 @@ func (h *ArticleHandler) GetArticleBySlug(c *gin.Context) {
 	// 获取slug
 	slug := c.Param("slug")
 	
+	// 检查是否需要渲染Markdown
+	renderHTML := c.Query("render_html") == "true"
+	
 	// 获取文章
-	article, err := h.articleService.GetArticleBySlug(c.Request.Context(), slug)
+	article, err := h.articleService.GetArticleBySlug(c.Request.Context(), slug, renderHTML)
 	if err != nil {
 		utils.NotFoundResponse(c, "文章不存在")
 		return
@@ -165,7 +173,29 @@ func (h *ArticleHandler) CreateArticle(c *gin.Context) {
 		return
 	}
 	
-	// 返回结果
+	// 检查是否需要渲染Markdown
+	renderHTML := c.Query("render_html") == "true"
+	var fullArticle *domain.Article
+	
+	if renderHTML {
+		// 获取完整文章信息，包含渲染后的HTML
+		fullArticle, err = h.articleService.GetArticleByID(c.Request.Context(), article.ID, true)
+		if err != nil {
+			// 如果获取失败，仍然返回基本创建成功信息
+			utils.CreatedResponse(c, "文章创建成功", gin.H{
+				"id":    article.ID,
+				"title": article.Title,
+				"slug":  article.Slug,
+			})
+			return
+		}
+		
+		// 返回完整文章信息
+		utils.CreatedResponse(c, "文章创建成功", fullArticle)
+		return
+	}
+	
+	// 返回基本创建成功信息
 	utils.CreatedResponse(c, "文章创建成功", gin.H{
 		"id":    article.ID,
 		"title": article.Title,
@@ -218,7 +248,29 @@ func (h *ArticleHandler) UpdateArticle(c *gin.Context) {
 		return
 	}
 	
-	// 返回结果
+	// 检查是否需要渲染Markdown
+	renderHTML := c.Query("render_html") == "true"
+	var fullArticle *domain.Article
+	
+	if renderHTML {
+		// 获取完整文章信息，包含渲染后的HTML
+		fullArticle, err = h.articleService.GetArticleByID(c.Request.Context(), article.ID, true)
+		if err != nil {
+			// 如果获取失败，仍然返回基本更新成功信息
+			utils.SuccessResponse(c, "文章更新成功", gin.H{
+				"id":    article.ID,
+				"title": article.Title,
+				"slug":  article.Slug,
+			})
+			return
+		}
+		
+		// 返回完整文章信息
+		utils.SuccessResponse(c, "文章更新成功", fullArticle)
+		return
+	}
+	
+	// 返回基本更新成功信息
 	utils.SuccessResponse(c, "文章更新成功", gin.H{
 		"id":    article.ID,
 		"title": article.Title,
@@ -278,8 +330,11 @@ func (h *ArticleHandler) GetFeaturedArticles(c *gin.Context) {
 		limit = 5
 	}
 	
+	// 检查是否需要渲染Markdown
+	renderHTML := c.Query("render_html") == "true"
+	
 	// 获取精选文章
-	articles, err := h.articleService.GetFeaturedArticles(c.Request.Context(), limit)
+	articles, err := h.articleService.GetFeaturedArticles(c.Request.Context(), limit, renderHTML)
 	if err != nil {
 		utils.InternalServerErrorResponse(c, "获取精选文章失败: "+err.Error())
 		return

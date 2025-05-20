@@ -4,6 +4,7 @@ import (
 	"Lin_studio/internal/api/handler"
 	"Lin_studio/internal/api/middleware"
 	"Lin_studio/internal/config"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -25,6 +26,21 @@ func SetupRouter(
 
 	// 允许跨域请求
 	r.Use(corsMiddleware())
+
+	// 根路径接口 - 直接通过IP和端口访问
+	r.GET("/", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "api服务正常",
+		})
+	})
+
+	// 健康检查端点
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "ok",
+			"message": "Service is running",
+		})
+	})
 
 	// API版本前缀
 	api := r.Group("/api/v1")

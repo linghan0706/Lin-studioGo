@@ -14,6 +14,7 @@ type Article struct {
 	Slug          string    `gorm:"size:255;uniqueIndex;not null" json:"slug"`
 	Excerpt       string    `gorm:"type:text" json:"excerpt,omitempty"`
 	Content       string    `gorm:"type:longtext;not null" json:"content"`
+	ContentHTML   string    `gorm:"type:longtext" json:"content_html,omitempty"` // 渲染后的HTML内容
 	AuthorID      uint      `gorm:"not null" json:"author_id"`
 	Author        *User     `gorm:"foreignKey:AuthorID" json:"author,omitempty"`
 	CategoryID    *uint     `json:"category_id,omitempty"`
@@ -55,6 +56,7 @@ type ArticleResponse struct {
 	Slug          string           `json:"slug"`
 	Excerpt       string           `json:"excerpt,omitempty"`
 	Content       string           `json:"content,omitempty"` // 根据请求选择是否包含全文
+	ContentHTML   string           `json:"content_html,omitempty"` // 渲染后的HTML内容
 	Author        UserResponse     `json:"author"`
 	Category      *CategoryResponse `json:"category,omitempty"`
 	Tags          []SimpleTagResponse `json:"tags,omitempty"`
@@ -118,6 +120,7 @@ func (a *Article) ToResponse(includeContent bool) ArticleResponse {
 	// 仅在需要时包含内容
 	if includeContent {
 		response.Content = a.Content
+		response.ContentHTML = a.ContentHTML // 添加HTML内容
 	}
 
 	return response

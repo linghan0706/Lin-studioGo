@@ -178,4 +178,98 @@ go test ./...
 
 ## 许可证
 
-[MIT License](LICENSE) 
+[MIT License](LICENSE)
+
+# Go依赖包国内CDN加速工具
+
+本仓库提供了Go语言依赖包下载的国内CDN加速配置工具和说明文档。
+
+## 文件说明
+
+- `goproxy_config.md` - 详细的Go代理配置文档，包含各种国内镜像源的使用方法
+- `set-goproxy.ps1` - PowerShell脚本，用于快速切换不同的Go代理配置
+
+## 使用方法
+
+### 配置脚本使用
+
+1. 在PowerShell中运行脚本：
+
+```powershell
+# 显示帮助信息
+.\set-goproxy.ps1 help
+
+# 设置为七牛云代理（推荐）
+.\set-goproxy.ps1 qiniu
+
+# 设置为阿里云代理
+.\set-goproxy.ps1 aliyun
+
+# 设置为百度代理
+.\set-goproxy.ps1 baidu
+
+# 设置为腾讯云代理
+.\set-goproxy.ps1 tencent
+
+# 使用多个代理组合（自动切换）
+.\set-goproxy.ps1 multi
+
+# 启用国内SUMDB
+.\set-goproxy.ps1 sumdb-on
+
+# 关闭SUMDB校验
+.\set-goproxy.ps1 sumdb-off
+
+# 恢复默认配置
+.\set-goproxy.ps1 default
+```
+
+### 手动配置
+
+如果不想使用脚本，您也可以直接运行以下命令：
+
+```bash
+# 设置GOPROXY
+go env -w GOPROXY=https://goproxy.cn,direct
+
+# 设置GOSUMDB
+go env -w GOSUMDB=sum.golang.google.cn
+# 或关闭SUMDB校验
+go env -w GOSUMDB=off
+```
+
+## 测试配置
+
+配置完成后，可以通过以下命令测试下载速度：
+
+```bash
+go mod download -x
+```
+
+## 查看当前配置
+
+```bash
+go env GOPROXY GOSUMDB
+```
+
+## 推荐配置
+
+对于中国大陆用户，推荐使用以下配置：
+
+```bash
+go env -w GOPROXY=https://goproxy.cn,direct
+go env -w GOSUMDB=sum.golang.google.cn
+```
+
+或使用脚本一键配置：
+
+```powershell
+.\set-goproxy.ps1 qiniu
+.\set-goproxy.ps1 sumdb-on
+```
+
+## 注意事项
+
+- 不同地区和网络环境下，各个镜像源的速度可能有所不同，建议测试后选择最适合您的镜像
+- GOSUMDB设置为off会提高下载速度，但会降低安全性，请根据自己的需求选择
+- 如果您的项目需要访问私有仓库，请适当配置GOPRIVATE环境变量 
