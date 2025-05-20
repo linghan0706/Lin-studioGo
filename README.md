@@ -31,9 +31,6 @@ Lin_studio/
 ├── cmd/                # 应用程序入口
 │   └── api/            # API服务入口
 │       └── main.go     # 主程序入口点
-├── docs/               # 文档
-│   ├── Admin-API.md    # 管理员API文档
-│   └── Public-API.md   # 公共API文档
 ├── internal/           # 内部包，不对外暴露
 │   ├── api/            # API层
 │   │   ├── handler/    # 请求处理器
@@ -118,13 +115,6 @@ go build -o lin-studio cmd/api/main.go
 
 如果需要使用Docker部署，可以添加Dockerfile和docker-compose.yml文件。
 
-## API文档
-
-项目包含两套API文档：
-
-- [公共API文档](./docs/Public-API.md) - 包含不需要认证或普通用户可访问的API
-- [管理系统API文档](./docs/Admin-API.md) - 包含需要管理员权限的API
-
 ### API认证
 
 大部分API需要JWT认证，在请求头中添加：
@@ -183,13 +173,6 @@ go test ./...
 # Go依赖包国内CDN加速工具
 
 本仓库提供了Go语言依赖包下载的国内CDN加速配置工具和说明文档。
-
-## 文件说明
-
-- `goproxy_config.md` - 详细的Go代理配置文档，包含各种国内镜像源的使用方法
-- `set-goproxy.ps1` - PowerShell脚本，用于快速切换不同的Go代理配置
-
-## 使用方法
 
 ### 配置脚本使用
 
