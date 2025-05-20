@@ -41,6 +41,8 @@ Lin_studio/
 │   ├── repository/     # 数据访问层
 │   ├── service/        # 业务逻辑层
 │   └── utils/          # 工具函数
+├── mysql-config        #部署环境MYSQL配置
+├── nginx               #NGINX反向代理
 
 ```
 
