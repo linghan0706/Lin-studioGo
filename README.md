@@ -41,7 +41,7 @@ Lin_studio/
 │   ├── repository/     # 数据访问层
 │   ├── service/        # 业务逻辑层
 │   └── utils/          # 工具函数
-└── pkg/                # 可重用的公共包
+
 ```
 
 ### 架构说明
