@@ -66,11 +66,11 @@ func GetConfig() Config {
 			WriteTimeout: time.Second * 60,
 		},
 		Database: DatabaseConfig{
-			Host:     getEnv("DB_HOST", "101.126.146.84"),
+			Host:     getEnv("DB_HOST", "Mysql__site"),
 			Port:     getEnv("DB_PORT", "3306"),
-			User:     getEnv("DB_USER", "root"),
-			Password: getEnv("DB_PASSWORD", "mysql_123"),
-			DBName:   getEnv("DB_NAME", "Nuxt_admin"),
+			User:     getEnv("DB_USER", "user_rootName"),
+			Password: getEnv("DB_PASSWORD", "Password"),
+			DBName:   getEnv("DB_NAME", "Database"),
 		},
 		JWT: JWTConfig{
 			Secret:          getEnv("JWT_SECRET", "your-secret-key"),
